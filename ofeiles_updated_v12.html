@@ -455,13 +455,30 @@ function signOut(){
 auth.onAuthStateChanged(user=>{
   if(user){
     currentUser=user;
-    document.getElementById('loginScreen').style.display='none';
-    document.getElementById('app').style.display='flex';
-    // Show avatar
-    const av=document.getElementById('userAvatar');
-    const img=document.getElementById('userAvatarImg');
-    if(av && img && user.photoURL){ img.src=user.photoURL; av.style.display='flex'; }
-    startFirestoreListener();
+    // ── WHITELIST CHECK ──
+    db.collection('whitelist').doc(user.email).get().then(doc=>{
+      if(doc.exists && doc.data().active===true){
+        // Approved!
+        document.getElementById('loginScreen').style.display='none';
+        document.getElementById('app').style.display='flex';
+        const av=document.getElementById('userAvatar');
+        const img=document.getElementById('userAvatarImg');
+        if(av && img && user.photoURL){ img.src=user.photoURL; av.style.display='flex'; }
+        startFirestoreListener();
+      } else {
+        // Not approved
+        auth.signOut();
+        const err=document.getElementById('loginError');
+        err.textContent='❌ Δεν έχεις πρόσβαση. Επικοινώνησε με τον διαχειριστή.';
+        err.style.display='block';
+        document.getElementById('loginScreen').style.display='flex';
+        document.getElementById('app').style.display='none';
+      }
+    }).catch(e=>{
+      auth.signOut();
+      document.getElementById('loginScreen').style.display='flex';
+      document.getElementById('app').style.display='none';
+    });
   } else {
     currentUser=null;
     document.getElementById('loginScreen').style.display='flex';
