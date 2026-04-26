@@ -1,4 +1,4 @@
-const CACHE = 'ofeiles-v1';
+const CACHE = 'ofeiles-v3';
 const FILES = [
   'ofeiles_updated_v11.html',
   'manifest.json'
