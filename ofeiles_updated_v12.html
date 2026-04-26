@@ -10,69 +10,34 @@
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
-<!-- Firebase v9 compat - stable redirect support -->
+<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script>
-const firebaseConfig = {
+firebase.initializeApp({
   apiKey: "AIzaSyAJcWnqbUS5rQ5esfTosQuiz5E0Z9ZlUQA",
   authDomain: "ofeiles-54d57.firebaseapp.com",
   projectId: "ofeiles-54d57",
   storageBucket: "ofeiles-54d57.firebasestorage.app",
   messagingSenderId: "690895027600",
   appId: "1:690895027600:web:749587dc0f2904f4b88715"
-};
-firebase.initializeApp(firebaseConfig);
+});
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-function signInWithGoogle(){
-  const provider = new firebase.auth.GoogleAuthProvider();
-  auth.signInWithRedirect(provider);
-}
-
-function doSignOut(){
-  if(!confirm('Αποσύνδεση;')) return;
-  auth.signOut();
-}
-
-// Process redirect result then listen for auth state
-auth.getRedirectResult().then(result => {
-  if(result && result.user) console.log('Redirect OK:', result.user.email);
-}).catch(e => console.warn('Redirect error:', e.code, e.message)).finally(() => {
-  auth.onAuthStateChanged(user => {
-    if(user){
-      db.collection('whitelist').doc(user.email.toLowerCase()).get().then(snap => {
-        if(snap.exists && snap.data().active === true){
-          window._fbUser = user;
-          document.getElementById('loginScreen').style.display = 'none';
-          document.getElementById('app').style.display = 'flex';
-          const av = document.getElementById('userAvatar');
-          const img = document.getElementById('userAvatarImg');
-          if(av && img && user.photoURL){ img.src = user.photoURL; av.style.display = 'flex'; }
-          if(window._appReady) window._appReady(user);
-        } else {
-          auth.signOut();
-          const err = document.getElementById('loginError');
-          err.textContent = '❌ Δεν έχεις πρόσβαση. Επικοινώνησε με τον διαχειριστή.';
-          err.style.display = 'block';
-          document.getElementById('loginScreen').style.display = 'flex';
-          document.getElementById('app').style.display = 'none';
-        }
-      }).catch(e => {
-        console.warn('Whitelist error:', e.message);
-        window._fbUser = user;
-        document.getElementById('loginScreen').style.display = 'none';
-        document.getElementById('app').style.display = 'flex';
-        if(window._appReady) window._appReady(user);
-      });
-    } else {
-      window._fbUser = null;
-      document.getElementById('loginScreen').style.display = 'flex';
-      document.getElementById('app').style.display = 'none';
-    }
-  });
+auth.onAuthStateChanged(user => {
+  if(user){
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    const av = document.getElementById('userAvatar');
+    const img = document.getElementById('userAvatarImg');
+    if(av && img && user.photoURL){ img.src = user.photoURL; av.style.display = 'flex'; }
+    if(window._appReady) window._appReady(user);
+  } else {
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+  }
 });
 </script>
 <style>
@@ -203,16 +168,18 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'Sora',sa
 </head>
 <body>
 <!-- LOGIN SCREEN -->
-<div id="loginScreen" style="display:none;position:fixed;inset:0;background:#0d1117;z-index:99999;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:32px">
+<div id="loginScreen" style="display:flex;position:fixed;inset:0;background:#0f172a;z-index:99999;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:32px">
   <div style="font-size:48px">💼</div>
   <div style="text-align:center">
     <div style="font-size:24px;font-weight:700;color:#f1f5f9;margin-bottom:6px">Οφειλές</div>
     <div style="font-size:14px;color:#64748b">Διαχείριση Συνεργατών</div>
   </div>
-  <button id="googleSignInBtn" onclick="signInWithGoogle()" style="display:flex;align-items:center;gap:12px;padding:14px 24px;border-radius:14px;background:#1e293b;border:1px solid #334155;color:#f1f5f9;font-size:15px;font-weight:600;cursor:pointer;font-family:Sora,sans-serif;width:100%;max-width:280px;justify-content:center">
-    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width:20px;height:20px">
-    Σύνδεση με Google
-  </button>
+  <div style="width:100%;max-width:300px;display:flex;flex-direction:column;gap:10px">
+    <input id="loginEmail" type="email" placeholder="Email" style="padding:13px 14px;border-radius:12px;border:1px solid #334155;background:#1e293b;color:#f1f5f9;font-size:15px;outline:none;width:100%;font-family:Sora,sans-serif">
+    <input id="loginPass" type="password" placeholder="Κωδικός" style="padding:13px 14px;border-radius:12px;border:1px solid #334155;background:#1e293b;color:#f1f5f9;font-size:15px;outline:none;width:100%;font-family:Sora,sans-serif">
+    <button onclick="doEmailLogin()" style="padding:14px;border-radius:12px;background:#38bdf8;border:none;color:#0f172a;font-size:15px;font-weight:700;cursor:pointer;font-family:Sora,sans-serif">Σύνδεση</button>
+    <button onclick="doResetPassword()" style="padding:10px;border-radius:12px;background:transparent;border:none;color:#64748b;font-size:13px;cursor:pointer;font-family:Sora,sans-serif">Ξέχασα τον κωδικό μου</button>
+  </div>
   <div id="loginError" style="color:#f87171;font-size:13px;text-align:center;display:none"></div>
 </div>
 
@@ -471,13 +438,44 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'Sora',sa
 // ── FIREBASE (initialized in head) ──
 let currentUser=null, unsubscribe=null, saveTimeout=null;
 
-// Called when user is authenticated and approved
 window._appReady = function(user){
   currentUser = user;
   startFirestoreListener();
 };
 
-function signOut(){ doSignOut(); }
+function doEmailLogin(){
+  const email=document.getElementById('loginEmail').value.trim();
+  const pass=document.getElementById('loginPass').value;
+  const err=document.getElementById('loginError');
+  err.style.display='none';
+  if(!email||!pass){ err.textContent='Βάλε email και κωδικό!'; err.style.display='block'; return; }
+  auth.signInWithEmailAndPassword(email, pass).catch(e=>{
+    err.textContent='❌ Λάθος email ή κωδικός!';
+    err.style.display='block';
+  });
+}
+
+function doResetPassword(){
+  const email=document.getElementById('loginEmail').value.trim();
+  const err=document.getElementById('loginError');
+  if(!email){ err.textContent='Βάλε πρώτα το email σου!'; err.style.display='block'; return; }
+  auth.sendPasswordResetEmail(email).then(()=>{
+    err.style.color='#34d399';
+    err.textContent='✅ Στάλθηκε email επαναφοράς κωδικού!';
+    err.style.display='block';
+  }).catch(e=>{
+    err.style.color='#f87171';
+    err.textContent='❌ '+e.message;
+    err.style.display='block';
+  });
+}
+
+function signOut(){
+  if(!confirm('Αποσύνδεση;')) return;
+  if(unsubscribe){ unsubscribe(); unsubscribe=null; }
+  currentUser=null;
+  auth.signOut();
+}
 
 
 
