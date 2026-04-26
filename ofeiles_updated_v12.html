@@ -1986,11 +1986,10 @@ function openHomeMonthPicker(){
 }
 
 
+// Unregister any old service workers — not needed in v12 (Firebase handles sync)
 if('serviceWorker' in navigator){
-  window.addEventListener('load', ()=>{
-    navigator.serviceWorker.register('sw.js')
-      .then(()=>console.log('SW registered'))
-      .catch(e=>console.log('SW error:',e));
+  navigator.serviceWorker.getRegistrations().then(regs=>{
+    regs.forEach(reg=>reg.unregister());
   });
 }
 
