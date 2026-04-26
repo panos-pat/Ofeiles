@@ -1,6 +1,6 @@
 const CACHE = 'ofeiles-v3';
 const FILES = [
-  'ofeiles_updated_v11.html',
+  'ofeiles_updated_v12.html',
   'manifest.json'
 ];
 
@@ -21,17 +21,29 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
+  const url = e.request.url;
+
+  // Never intercept Firebase, Google Auth or POST requests
+  if (
+    url.includes('firebaseapp.com') ||
+    url.includes('firebase.google.com') ||
+    url.includes('googleapis.com') ||
+    url.includes('accounts.google.com') ||
+    url.includes('securetoken.google.com') ||
+    url.includes('identitytoolkit.google.com') ||
+    e.request.method !== 'GET'
+  ) {
+    return;
+  }
+
   e.respondWith(
     caches.match(e.request).then(cached => {
-      // Network first για το κύριο HTML, cache fallback για offline
-      if(cached && !navigator.onLine) return cached;
-      return fetch(e.request)
-        .then(res => {
-          const clone = res.clone();
-          caches.open(CACHE).then(cache => cache.put(e.request, clone));
-          return res;
-        })
-        .catch(() => cached);
+      if (cached && !navigator.onLine) return cached;
+      return fetch(e.request).then(res => {
+        const clone = res.clone();
+        caches.open(CACHE).then(cache => cache.put(e.request, clone));
+        return res;
+      }).catch(() => cached);
     })
   );
 });
