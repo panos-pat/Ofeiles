@@ -443,8 +443,15 @@ let saveTimeout=null;
 
 // ── AUTH ──
 function signInWithGoogle(){
+  const btn=document.getElementById('googleSignInBtn');
+  btn.textContent='Σύνδεση...'; btn.disabled=true;
   const provider=new firebase.auth.GoogleAuthProvider();
-  auth.signInWithRedirect(provider);
+  auth.signInWithPopup(provider).catch(e=>{
+    document.getElementById('loginError').textContent=e.message;
+    document.getElementById('loginError').style.display='block';
+    btn.innerHTML='<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width:20px;height:20px"> Σύνδεση με Google';
+    btn.disabled=false;
+  });
 }
 
 function signOut(){
