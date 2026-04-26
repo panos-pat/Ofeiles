@@ -1,4 +1,4 @@
-const CACHE = 'ofeiles-v3';
+const CACHE = 'ofeiles-v4';
 const FILES = [
   'ofeiles_updated_v12.html',
   'manifest.json'
@@ -23,14 +23,16 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = e.request.url;
 
-  // Never intercept Firebase, Google Auth or POST requests
+  // Never intercept auth handlers or non-GET requests
   if (
+    url.includes('/__/auth/') ||
     url.includes('firebaseapp.com') ||
     url.includes('firebase.google.com') ||
     url.includes('googleapis.com') ||
     url.includes('accounts.google.com') ||
     url.includes('securetoken.google.com') ||
-    url.includes('identitytoolkit.google.com') ||
+    url.includes('identitytoolkit') ||
+    url.includes('chrome-extension') ||
     e.request.method !== 'GET'
   ) {
     return;
@@ -40,8 +42,10 @@ self.addEventListener('fetch', e => {
     caches.match(e.request).then(cached => {
       if (cached && !navigator.onLine) return cached;
       return fetch(e.request).then(res => {
-        const clone = res.clone();
-        caches.open(CACHE).then(cache => cache.put(e.request, clone));
+        try {
+          const clone = res.clone();
+          caches.open(CACHE).then(cache => cache.put(e.request, clone));
+        } catch(err) {}
         return res;
       }).catch(() => cached);
     })

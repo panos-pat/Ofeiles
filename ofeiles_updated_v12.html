@@ -410,7 +410,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'Sora',sa
 // ── FIREBASE CONFIG ──
 const firebaseConfig = {
   apiKey: "AIzaSyAJcWnqbUS5rQ5esfTosQuiz5E0Z9ZlUQA",
-  authDomain: "ofeiles-54d57.web.app",
+  authDomain: "ofeiles-54d57.firebaseapp.com",
   projectId: "ofeiles-54d57",
   storageBucket: "ofeiles-54d57.firebasestorage.app",
   messagingSenderId: "690895027600",
@@ -425,10 +425,19 @@ let unsubscribe  = null;
 // Set persistence to LOCAL (survives page reload)
 auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(e=>console.warn(e));
 
-// Handle redirect result
+let redirectProcessed=false;
+
+// Handle redirect result FIRST before onAuthStateChanged
 auth.getRedirectResult().then(result=>{
-  if(result && result.user) console.log('Redirect login OK:', result.user.email);
-}).catch(e=>console.warn('Redirect error:',e.message));
+  redirectProcessed=true;
+  if(result && result.user){
+    console.log('Redirect login OK:', result.user.email);
+    // onAuthStateChanged will fire after this with the user
+  }
+}).catch(e=>{
+  redirectProcessed=true;
+  console.warn('Redirect error:',e.message);
+});
 
 
 
