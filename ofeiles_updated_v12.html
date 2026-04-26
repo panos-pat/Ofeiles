@@ -10,12 +10,11 @@
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
-<!-- Firebase v9 modular -->
-<script type="module">
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-import { getFirestore, doc, getDoc, collection, setDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
-
+<!-- Firebase v9 compat - stable redirect support -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script>
 const firebaseConfig = {
   apiKey: "AIzaSyAJcWnqbUS5rQ5esfTosQuiz5E0Z9ZlUQA",
   authDomain: "ofeiles-54d57.firebaseapp.com",
@@ -24,49 +23,56 @@ const firebaseConfig = {
   messagingSenderId: "690895027600",
   appId: "1:690895027600:web:749587dc0f2904f4b88715"
 };
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-window._fb = { auth, db, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged, doc, getDoc, collection, setDoc, onSnapshot };
+function signInWithGoogle(){
+  const provider = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithRedirect(provider);
+}
 
-// Handle redirect result
-getRedirectResult(auth).then(result => {
-  if(result?.user) console.log('Redirect OK:', result.user.email);
-}).catch(e => console.warn('Redirect error:', e.message));
+function doSignOut(){
+  if(!confirm('Αποσύνδεση;')) return;
+  auth.signOut();
+}
 
-// Auth state
-onAuthStateChanged(auth, user => {
-  if(user){
-    window._fbUser = user;
-    getDoc(doc(db, 'whitelist', user.email.toLowerCase())).then(snap => {
-      if(snap.exists() && snap.data().active === true){
-        document.getElementById('loginScreen').style.display='none';
-        document.getElementById('app').style.display='flex';
-        const av=document.getElementById('userAvatar');
-        const img=document.getElementById('userAvatarImg');
-        if(av && img && user.photoURL){ img.src=user.photoURL; av.style.display='flex'; }
-        window._fbStartListener && window._fbStartListener(user);
-      } else {
-        signOut(auth);
-        const err=document.getElementById('loginError');
-        err.textContent='❌ Δεν έχεις πρόσβαση. Επικοινώνησε με τον διαχειριστή.';
-        err.style.display='block';
-      }
-    }).catch(e => {
-      console.warn('Whitelist error:', e.message);
-      document.getElementById('loginScreen').style.display='none';
-      document.getElementById('app').style.display='flex';
-      window._fbStartListener && window._fbStartListener(user);
-    });
-  } else {
-    setTimeout(() => {
-      if(!window._fbUser){
-        document.getElementById('loginScreen').style.display='flex';
-        document.getElementById('app').style.display='none';
-      }
-    }, 1500);
-  }
+// Process redirect result then listen for auth state
+auth.getRedirectResult().then(result => {
+  if(result && result.user) console.log('Redirect OK:', result.user.email);
+}).catch(e => console.warn('Redirect error:', e.code, e.message)).finally(() => {
+  auth.onAuthStateChanged(user => {
+    if(user){
+      db.collection('whitelist').doc(user.email.toLowerCase()).get().then(snap => {
+        if(snap.exists && snap.data().active === true){
+          window._fbUser = user;
+          document.getElementById('loginScreen').style.display = 'none';
+          document.getElementById('app').style.display = 'flex';
+          const av = document.getElementById('userAvatar');
+          const img = document.getElementById('userAvatarImg');
+          if(av && img && user.photoURL){ img.src = user.photoURL; av.style.display = 'flex'; }
+          if(window._appReady) window._appReady(user);
+        } else {
+          auth.signOut();
+          const err = document.getElementById('loginError');
+          err.textContent = '❌ Δεν έχεις πρόσβαση. Επικοινώνησε με τον διαχειριστή.';
+          err.style.display = 'block';
+          document.getElementById('loginScreen').style.display = 'flex';
+          document.getElementById('app').style.display = 'none';
+        }
+      }).catch(e => {
+        console.warn('Whitelist error:', e.message);
+        window._fbUser = user;
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('app').style.display = 'flex';
+        if(window._appReady) window._appReady(user);
+      });
+    } else {
+      window._fbUser = null;
+      document.getElementById('loginScreen').style.display = 'flex';
+      document.getElementById('app').style.display = 'none';
+    }
+  });
 });
 </script>
 <style>
@@ -462,34 +468,16 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'Sora',sa
 <div id="pdfScratch" style="position:fixed;left:-10000px;top:0;width:800px"></div>
 
 <script>
-// ── FIREBASE (loaded via module script above) ──
-let auth, db, currentUser=null, unsubscribe=null;
+// ── FIREBASE (initialized in head) ──
+let currentUser=null, unsubscribe=null, saveTimeout=null;
 
-// Wait for Firebase module to initialize
-function waitForFB(cb){
-  if(window._fb){ auth=window._fb.auth; db=window._fb.db; cb(); }
-  else setTimeout(()=>waitForFB(cb), 50);
-}
-
-function signInWithGoogle(){
-  waitForFB(()=>{
-    const provider=new window._fb.GoogleAuthProvider();
-    window._fb.signInWithRedirect(auth, provider);
-  });
-}
-
-function signOut(){
-  if(!confirm('Αποσύνδεση;')) return;
-  if(unsubscribe) unsubscribe();
-  currentUser=null;
-  window._fb.signOut(auth);
-}
-
-// Called by Firebase module when user is approved
-window._fbStartListener = function(user){
+// Called when user is authenticated and approved
+window._appReady = function(user){
   currentUser = user;
   startFirestoreListener();
 };
+
+function signOut(){ doSignOut(); }
 
 
 
@@ -508,10 +496,9 @@ let saveTimeout=null;
 // ── FIRESTORE LISTENER ──
 function startFirestoreListener(){
   if(unsubscribe) unsubscribe();
-  const {doc, onSnapshot, setDoc} = window._fb;
-  const docRef=doc(db, 'users', currentUser.uid, 'data', 'state');
-  unsubscribe=onSnapshot(docRef, snap=>{
-    if(snap.exists()){
+  const docRef=db.collection('users').doc(currentUser.uid).collection('data').doc('state');
+  unsubscribe=docRef.onSnapshot(snap=>{
+    if(snap.exists){
       const d=snap.data();
       state=d;
       if(!state.linkedTx) state.linkedTx=[];
@@ -529,9 +516,8 @@ function save(){
   if(!currentUser) return;
   clearTimeout(saveTimeout);
   saveTimeout=setTimeout(()=>{
-    const {doc, setDoc} = window._fb;
-    const docRef=doc(db, 'users', currentUser.uid, 'data', 'state');
-    setDoc(docRef, state).catch(e=>console.error('Save error:',e));
+    const docRef=db.collection('users').doc(currentUser.uid).collection('data').doc('state');
+    docRef.set(state).catch(e=>console.error('Save error:',e));
     hideBackupBadge();
   }, 600);
   showBackupBadge();
